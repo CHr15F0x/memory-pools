@@ -1,0 +1,13 @@
+language:
+   - cpp
+
+script:
+    - cmake .
+    - make    
+
+branches:
+  only:
+    - master
+
+notifications:
+      email: false
