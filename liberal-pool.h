@@ -1,5 +1,5 @@
-#ifndef KL_COMPACT_POOL_H_
-#define KL_COMPACT_POOL_H_
+#ifndef KL_LIBERAL_POOL_H_
+#define KL_LIBERAL_POOL_H_
 
 #include <algorithm>
 #include <cassert>
@@ -8,20 +8,20 @@
 #include <cstdlib>
 #include <type_traits>
 
-#define KL_COMPACT_POOL_RUNTIME_CHECKS 1
+#define KL_LIBERAL_POOL_RUNTIME_CHECKS 1
 
-#if KL_COMPACT_POOL_RUNTIME_CHECKS
-#define KL_COMPACT_POOL_CHECK_POINTER(OFFSET, CAPACITY, PTR)\
+#if KL_LIBERAL_POOL_RUNTIME_CHECKS
+#define KL_LIBERAL_POOL_CHECK_POINTER(OFFSET, CAPACITY, PTR)\
     assert(((OFFSET) >= 0u) || ("Pointer does not belong to pool." == 0));\
     assert(((OFFSET) < static_cast<ptrdiff_t>(CAPACITY)) || ("Pointer does not belong to pool." == 0));\
     assert((reinterpret_cast<uintptr_t>(PTR) % alignof(aligned_storage_t) == 0) || ("Pointer is not aligned properly" == 0))
-#define KL_COMPACT_POOL_CHECK_CAPACITY(CAPACITY)\
+#define KL_LIBERAL_POOL_CHECK_CAPACITY(CAPACITY)\
     assert((capacity > 0u) || (KL_MIN_CAPACITY_MSG == 0));\
     assert((capacity <= private_internal::MAX_SUPPORTED_CAPACITY) || (KL_MAX_CAPACITY_MSG == 0));
 #else
-#define KL_COMPACT_POOL_CHECK_POINTER(OFFSET, CAPACITY, PTR)
-#define KL_COMPACT_POOL_CHECK_CAPACITY(CAPACITY)
-#endif // KL_COMPACT_POOL_RUNTIME_CHECKS
+#define KL_LIBERAL_POOL_CHECK_POINTER(OFFSET, CAPACITY, PTR)
+#define KL_LIBERAL_POOL_CHECK_CAPACITY(CAPACITY)
+#endif // KL_LIBERAL_POOL_RUNTIME_CHECKS
 
 namespace kl
 {
@@ -89,7 +89,7 @@ inline cpu_word_t LeastBitClear(cpu_word_t word)
     return out;
 }
 
-template <size_t Level>
+template <size_t Depth>
 size_t OffsetAndMark(cpu_word_t *allocated)
 {
     (void)allocated;
@@ -192,7 +192,9 @@ void Unmark<0>(cpu_word_t *allocated, size_t offset)
     allocated[0] &= ~(ONE << offset);
 }
 
-// TODO check if shift & bithacks for division and modulo are faster
+//
+// TODO check if bithacks for division and modulo are faster, even for -03
+//
 
 template <>
 void Unmark<1>(cpu_word_t *allocated, size_t offset)
@@ -243,86 +245,94 @@ void Unmark<3>(cpu_word_t *allocated, size_t offset)
 }
 } // namespace private_internal
 
+#define KL_LIBERAL_POOL_COMMON_IMPL\
+    T *Alloc()\
+    {\
+        if (size_ == capacity_)\
+        {\
+            return nullptr;\
+        }\
+    \
+        ++size_;\
+        max_utilisation_ = std::max(size_, max_utilisation_);\
+        size_t offset = offset_and_mark_(allocated_);\
+        return reinterpret_cast<T *>(&buffer_[offset]);\
+    }\
+    \
+    void Free(T *p)\
+    {\
+        ptrdiff_t offset = reinterpret_cast<aligned_storage_t *>(p) - buffer_;\
+        KL_LIBERAL_POOL_CHECK_POINTER(offset, capacity_, p);\
+        unmark_(allocated_, offset);\
+        --size_;\
+    }\
+    \
+    size_t Size() const\
+    {\
+        return size_;\
+    }\
+    \
+    size_t MaxUtilisation() const\
+    {\
+        return max_utilisation_;\
+    }\
+    \
+    size_t Capacity() const\
+    {\
+        return capacity_;\
+    }\
+    \
+    constexpr size_t MaxCapacity()\
+    {\
+        return private_internal::MAX_SUPPORTED_CAPACITY;\
+    }
+
 // Capacity set at compile time
-template<typename T, size_t capacity>
-class CompactPool
+template<typename T, size_t capacity_>
+class StaticLiberalPool
 {
 private:
 
-    static_assert(capacity > 0, KL_MIN_CAPACITY_MSG);
-    static_assert(capacity <= (private_internal::MAX_SUPPORTED_CAPACITY), KL_MAX_CAPACITY_MSG);
+    static_assert(capacity_ > 0, KL_MIN_CAPACITY_MSG);
+    static_assert(capacity_ <= (private_internal::MAX_SUPPORTED_CAPACITY), KL_MAX_CAPACITY_MSG);
 
-    static constexpr size_t level = private_internal::GetLevel(capacity);
     typedef typename std::aligned_storage<sizeof(T), alignof(T)>::type aligned_storage_t;
+
+    static constexpr size_t depth = private_internal::GetLevel(capacity_);
+    static constexpr auto offset_and_mark_ = &private_internal::OffsetAndMark<depth>;
+    static constexpr auto unmark_ = &private_internal::Unmark<depth>;
+
     uint_fast32_t size_;
     uint_fast32_t max_utilisation_;
-    aligned_storage_t buffer[capacity];
-    private_internal::cpu_word_t allocated[private_internal::OptimalAllocatedSize2(capacity, level)];
+    aligned_storage_t buffer_[capacity_];
+    private_internal::cpu_word_t allocated_[private_internal::OptimalAllocatedSize2(capacity_, depth)];
 
 public:
 
-    CompactPool() :
+    StaticLiberalPool() :
         size_(0u),
         max_utilisation_(0u),
-        buffer(),
-        allocated()
+        buffer_(),
+        allocated_()
     {}
 
-    ~CompactPool()
+    ~StaticLiberalPool()
     {}
 
-    T *Alloc()
-    {
-        if (size_ == capacity)
-        {
-            // Full
-            return nullptr;
-        }
+    KL_LIBERAL_POOL_COMMON_IMPL
 
-        ++size_;
-        max_utilisation_ = std::max(size_, max_utilisation_);
-        size_t offset = private_internal::OffsetAndMark<level>(allocated);
-        return reinterpret_cast<T *>(&buffer[offset]);
-    }
-
-    void Free(T *p)
-    {
-        ptrdiff_t offset = reinterpret_cast<aligned_storage_t *>(p) - buffer;
-        KL_COMPACT_POOL_CHECK_POINTER(offset, capacity, p);
-        private_internal::Unmark<level>(allocated, offset);
-        --size_;
-    }
-
-    size_t Size() const
-    {
-        return size_;
-    }
-
-    size_t MaxUtilisation() const
-    {
-        return max_utilisation_;
-    }
-
-    constexpr size_t Capacity()
-    {
-        return capacity;
-    }
-
-    constexpr size_t MaxCapacity()
-    {
-        return private_internal::MAX_SUPPORTED_CAPACITY;
-    }
-}; // class CompactPool
+}; // class StaticLiberalPool
 
 // Capacity set in runtime
 template<typename T>
-class CompactPool2
+class LiberalPool
 {
 private:
 
     typedef typename std::aligned_storage<sizeof(T), alignof(T)>::type aligned_storage_t;
-    typedef size_t (* OffsetAndMarkFn)(private_internal::cpu_word_t *allocated);
-    typedef void (* UnmarkFn)(private_internal::cpu_word_t *allocated, size_t offset);
+    typedef size_t (* OffsetAndMarkFn)(private_internal::cpu_word_t *allocated_);
+    typedef void (* UnmarkFn)(private_internal::cpu_word_t *allocated_, size_t offset);
+
     uint_fast32_t capacity_;
     uint_fast32_t size_;
     uint_fast32_t max_utilisation_;
@@ -362,7 +372,7 @@ private:
 
 public:
 
-    CompactPool2(size_t capacity) :
+    LiberalPool(size_t capacity) :
         capacity_(capacity),
         size_(0u),
         max_utilisation_(0u),
@@ -372,57 +382,18 @@ public:
         offset_and_mark_(ChooseOffsetAndMarkFn()),
         unmark_(ChooseUnmarkFn())
     {
-        KL_COMPACT_POOL_CHECK_CAPACITY(capacity_);
+        KL_LIBERAL_POOL_CHECK_CAPACITY(capacity_);
     }
 
-    ~CompactPool2()
+    ~LiberalPool()
     {
         std::free(buffer_);
         std::free(allocated_);
     }
 
-    T *Alloc()
-    {
-        if (size_ == capacity_)
-        {
-            // Full
-            return nullptr;
-        }
+    KL_LIBERAL_POOL_COMMON_IMPL
 
-        ++size_;
-        max_utilisation_ = std::max(size_, max_utilisation_);
-        size_t offset = offset_and_mark_(allocated_);
-        return reinterpret_cast<T *>(&buffer_[offset]);
-    }
-
-    void Free(T *p)
-    {
-        ptrdiff_t offset = reinterpret_cast<aligned_storage_t *>(p) - buffer_;
-        KL_COMPACT_POOL_CHECK_POINTER(offset, capacity_, p);
-        unmark_(allocated_, offset);
-        --size_;
-    }
-
-    size_t Size() const
-    {
-        return size_;
-    }
-
-    size_t MaxUtilisation() const
-    {
-        return max_utilisation_;
-    }
-
-    size_t Capacity() const
-    {
-        return capacity_;
-    }
-
-    constexpr size_t MaxCapacity()
-    {
-        return private_internal::MAX_SUPPORTED_CAPACITY;
-    }
-}; // class CompactPool2
+}; // class LiberalPool
 
 } // namespace kl
-#endif // KL_COMPACT_POOL_H_
+#endif // KL_LIBERAL_POOL_H_

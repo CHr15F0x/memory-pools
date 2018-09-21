@@ -10,6 +10,6 @@ include_directories(${PROJECT_SOURCE_DIR}/tests/googletest/googletest/include/gt
 
 set(CMAKE_CXX_FLAGS  ${CMAKE_CXX_FLAGS} "-O3 -std=c++11 -Wall -Werror -Wunused -Wextra -Wpedantic -pedantic -Wshadow -Wlogical-op -pedantic-errors -Wold-style-cast")
 
-add_executable(compact-pool-test tests/compact-pool-test.cpp)
-target_link_libraries(compact-pool-test gtest)
-add_test(compact-pool-test compact-pool-test)
+add_executable(liberal-pool-test tests/liberal-pool-test.cpp)
+target_link_libraries(liberal-pool-test gtest)
+add_test(liberal-pool-test liberal-pool-test)

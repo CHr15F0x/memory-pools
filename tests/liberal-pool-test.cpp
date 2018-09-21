@@ -1,5 +1,5 @@
-#include <kl-compact-pool.h>
 #include <gtest.h>
+#include "liberal-pool.h"
 
 using namespace kl;
 using namespace kl::private_internal;
@@ -199,32 +199,32 @@ static void PoolTestFn(PoolType &pool)
     }
 }
 
-template<typename CompactPoolType>
-struct CompactPoolTest : public ::testing::Test
+template<typename PoolType>
+struct StaticLiberalPoolTest : public ::testing::Test
 {};
 
 typedef ::testing::Types<
-    CompactPool<A, 1u>,
-    CompactPool<A, 13u>,
-    CompactPool<A, BITS>,
-    CompactPool<A, 811u>,
-    CompactPool<A, BITS2>,
-    CompactPool<A, 11113u>,
-    CompactPool<A, BITS3>,
-    CompactPool<A, 262217u>,
-    CompactPool<A, BITS4>
-> CompactPoolTypes;
+    StaticLiberalPool<A, 1u>,
+    StaticLiberalPool<A, 13u>,
+    StaticLiberalPool<A, BITS>,
+    StaticLiberalPool<A, 811u>,
+    StaticLiberalPool<A, BITS2>,
+    StaticLiberalPool<A, 11113u>,
+    StaticLiberalPool<A, BITS3>,
+    StaticLiberalPool<A, 262217u>,
+    StaticLiberalPool<A, BITS4>
+> PoolTypes;
 
-TYPED_TEST_CASE(CompactPoolTest, CompactPoolTypes);
+TYPED_TEST_CASE(StaticLiberalPoolTest, PoolTypes);
 
-TYPED_TEST(CompactPoolTest, AllocAndRandomFree_Twice_NoMemoryCorruption)
+TYPED_TEST(StaticLiberalPoolTest, AllocAndRandomFree_Twice_NoMemoryCorruption)
 {
     // This kind of pool has to be static, using it on the stack could easily lead to overflow
     static TypeParam pool;
     PoolTestFn(pool);
 }
 
-TEST(CompactPool2Test, AllocAndRandomFree_Twice_NoMemoryCorruption)
+TEST(LiberalPoolTest, AllocAndRandomFree_Twice_NoMemoryCorruption)
 {
     const size_t CAPCITIES[] =
     {
@@ -233,7 +233,7 @@ TEST(CompactPool2Test, AllocAndRandomFree_Twice_NoMemoryCorruption)
 
     for (size_t k = 0; k < sizeof(CAPCITIES) / sizeof(CAPCITIES[0]); ++k)
     {
-        CompactPool2<A> pool(CAPCITIES[k]);
+        LiberalPool<A> pool(CAPCITIES[k]);
         PoolTestFn(pool);
     }
 }
