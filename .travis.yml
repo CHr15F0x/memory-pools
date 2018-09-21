@@ -3,7 +3,8 @@ language:
 
 script:
     - cmake .
-    - make    
+    - make
+    - make test
 
 branches:
   only:
