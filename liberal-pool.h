@@ -59,21 +59,21 @@ inline constexpr T Pow(const T base, cpu_word_t const exponent)
 }
 
 template<class T>
-inline constexpr size_t GetLevel(const T capacity, const size_t level = MAX_SUPPORTED_DEPTH)
+inline constexpr size_t TreeDepth(const T capacity, const size_t depth = MAX_SUPPORTED_DEPTH)
 {
-    return level == 0 ? 0 : (capacity - 1) & (private_internal::MASK << (private_internal::SHIFT * (level))) ? level : GetLevel(capacity, level - 1u);
+    return depth == 0 ? 0 : (capacity - 1) & (private_internal::MASK << (private_internal::SHIFT * (depth))) ? depth : TreeDepth(capacity, depth - 1u);
 }
 
 template<class T>
-inline constexpr T MaxTreeSize(const T level)
+inline constexpr T MaxTreeSize(const T depth)
 {
-    return (level == 0) ? 1 : Pow(BITS, level) + MaxTreeSize(level - 1u);
+    return (depth == 0) ? 1 : Pow(BITS, depth) + MaxTreeSize(depth - 1u);
 }
 
 template<class T>
-inline constexpr T OptimalAllocatedSize2(const T capacity, const size_t level)
+inline constexpr T TreeSize(const T capacity, const size_t depth)
 {
-    return (level == 0) ? 1 : (capacity - 1) / BITS + 1 + MaxTreeSize(level - 1u);
+    return (depth == 0) ? 1 : (capacity - 1) / BITS + 1 + MaxTreeSize(depth - 1u);
 }
 
 constexpr size_t BITS2 = Pow(BITS, 2);
@@ -178,7 +178,7 @@ size_t OffsetAndMark<3>(cpu_word_t *allocated)
     return offset;
 }
 
-template <size_t Level>
+template <size_t Depth>
 void Unmark(cpu_word_t *allocated, size_t offset)
 {
     (void)allocated;
@@ -298,14 +298,14 @@ private:
 
     typedef typename std::aligned_storage<sizeof(T), alignof(T)>::type aligned_storage_t;
 
-    static constexpr size_t depth = private_internal::GetLevel(capacity_);
+    static constexpr size_t depth = private_internal::TreeDepth(capacity_);
     static constexpr auto offset_and_mark_ = &private_internal::OffsetAndMark<depth>;
     static constexpr auto unmark_ = &private_internal::Unmark<depth>;
 
     uint_fast32_t size_;
     uint_fast32_t max_utilisation_;
     aligned_storage_t buffer_[capacity_];
-    private_internal::cpu_word_t allocated_[private_internal::OptimalAllocatedSize2(capacity_, depth)];
+    private_internal::cpu_word_t allocated_[private_internal::TreeSize(capacity_, depth)];
 
 public:
 
@@ -376,9 +376,9 @@ public:
         capacity_(capacity),
         size_(0u),
         max_utilisation_(0u),
-        depth_(private_internal::GetLevel(capacity)),
+        depth_(private_internal::TreeDepth(capacity)),
         buffer_(reinterpret_cast<aligned_storage_t *>(std::malloc(capacity_ * sizeof(aligned_storage_t)))),
-        allocated_(reinterpret_cast<private_internal::cpu_word_t *>(std::calloc(private_internal::OptimalAllocatedSize2(capacity_, depth_), sizeof(private_internal::cpu_word_t)))),
+        allocated_(reinterpret_cast<private_internal::cpu_word_t *>(std::calloc(private_internal::TreeSize(capacity_, depth_), sizeof(private_internal::cpu_word_t)))),
         offset_and_mark_(ChooseOffsetAndMarkFn()),
         unmark_(ChooseUnmarkFn())
     {

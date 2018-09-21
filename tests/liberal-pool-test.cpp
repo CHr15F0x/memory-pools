@@ -20,23 +20,23 @@ TEST(private_internal, LeastBitClear)
     EXPECT_EQ(BITS - 1, LeastBitClear(kAllBut1BitsSet));
 }
 
-struct GetLevelTestData
+struct TreeDepthTestData
 {
     size_t expected_depth;
     size_t input_capacity;
 };
 
-struct GetLevelTest: public ::testing::TestWithParam<GetLevelTestData>
+struct TreeDepthTest: public ::testing::TestWithParam<TreeDepthTestData>
 {
-    GetLevelTestData test_data;
+    TreeDepthTestData test_data;
 };
 
-TEST_P(GetLevelTest, GetLevel)
+TEST_P(TreeDepthTest, TreeDepth)
 {
-    EXPECT_EQ(GetParam().expected_depth, GetLevel(GetParam().input_capacity));
+    EXPECT_EQ(GetParam().expected_depth, TreeDepth(GetParam().input_capacity));
 }
 
-GetLevelTestData kGetLevelTestCases[] =
+TreeDepthTestData kTreeDepthTestCases[] =
 {
     {0u, 1u},
     {0u, BITS - 1u},
@@ -52,25 +52,25 @@ GetLevelTestData kGetLevelTestCases[] =
     {3u, BITS4}
 };
 
-INSTANTIATE_TEST_CASE_P(private_internal, GetLevelTest, ::testing::ValuesIn(kGetLevelTestCases));
+INSTANTIATE_TEST_CASE_P(private_internal, TreeDepthTest, ::testing::ValuesIn(kTreeDepthTestCases));
 
-struct GetTreeSizeTestData
+struct TreeSizeTestData
 {
     size_t expected_tree_size;
     size_t input_capacity;
 };
 
-struct GetTreeSizeTest: public ::testing::TestWithParam<GetTreeSizeTestData>
+struct TreeSizeTest: public ::testing::TestWithParam<TreeSizeTestData>
 {
-    GetTreeSizeTestData test_data;
+    TreeSizeTestData test_data;
 };
 
-TEST_P(GetTreeSizeTest, GetTreeSize)
+TEST_P(TreeSizeTest, TreeSize)
 {
-    EXPECT_EQ(GetParam().expected_tree_size, OptimalAllocatedSize2(GetParam().input_capacity, GetLevel(GetParam().input_capacity)));
+    EXPECT_EQ(GetParam().expected_tree_size, TreeSize(GetParam().input_capacity, TreeDepth(GetParam().input_capacity)));
 }
 
-GetTreeSizeTestData kGetTreeSizeTestCases[] =
+TreeSizeTestData kTreeSizeTestCases[] =
 {
     {1u, 1u},
     {1u, BITS - 1u},
@@ -88,10 +88,10 @@ GetTreeSizeTestData kGetTreeSizeTestCases[] =
     {BITS3 + BITS2 + BITS + 1u, BITS4}
 };
 
-INSTANTIATE_TEST_CASE_P(private_internal, GetTreeSizeTest, ::testing::ValuesIn(kGetTreeSizeTestCases));
+INSTANTIATE_TEST_CASE_P(private_internal, TreeSizeTest, ::testing::ValuesIn(kTreeSizeTestCases));
 
 template <size_t Depth>
-struct TreeDepth
+struct TreeDepthHelper
 {
     static constexpr size_t depth = Depth;
     static constexpr size_t max_capacity = Pow(BITS, depth);
@@ -99,19 +99,19 @@ struct TreeDepth
 };
 
 template<typename TreeDepthType>
-struct TreeDepthTest : public ::testing::Test
+struct MarkUnmarkTest : public ::testing::Test
 {};
 
 typedef ::testing::Types<
-    TreeDepth<0u>,
-    TreeDepth<1u>,
-    TreeDepth<2u>,
-    TreeDepth<3u>
+    TreeDepthHelper<0u>,
+    TreeDepthHelper<1u>,
+    TreeDepthHelper<2u>,
+    TreeDepthHelper<3u>
 > TreeDepthTypes;
 
-TYPED_TEST_CASE(TreeDepthTest, TreeDepthTypes);
+TYPED_TEST_CASE(MarkUnmarkTest, TreeDepthTypes);
 
-TYPED_TEST(TreeDepthTest, private_internal_OffsetAndMark_AndThen_Unmark)
+TYPED_TEST(MarkUnmarkTest, private_internal_OffsetAndMark_AndThen_Unmark)
 {
     cpu_word_t mask_tree[TypeParam::masks_size];
     memset(mask_tree, 0u, sizeof(mask_tree));
