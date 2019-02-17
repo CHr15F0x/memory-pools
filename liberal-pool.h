@@ -350,9 +350,7 @@ private:
             case 1u: return private_internal::OffsetAndMark<1>;
             case 2u: return private_internal::OffsetAndMark<2>;
             case 3u: return private_internal::OffsetAndMark<3>;
-            default:
-                assert("Invalid depth." == 0);
-                return nullptr;
+            default: return nullptr;
         }
     }
 
@@ -364,9 +362,7 @@ private:
             case 1u: return private_internal::Unmark<1>;
             case 2u: return private_internal::Unmark<2>;
             case 3u: return private_internal::Unmark<3>;
-            default:
-                assert("Invalid depth." == 0);
-                return nullptr;
+            default: return nullptr;
         }
     }
 
