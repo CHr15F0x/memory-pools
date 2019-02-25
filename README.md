@@ -14,5 +14,10 @@ Just __#include__ __liberal-pool.h__ into your project.
 
 Pool capacity can be set during compilation (_StaticLiberalPool_) or in run time (_LiberalPool_).
 
+## Build & run tests
+```
+mkdir -p build && cd build && cmake .. && make -j && make test
+```
+_Remember to ```git submodule update --init --recursive``` after cloning_
 ## Platform
-So far available for: (__x86__ || __x86_64__) && __linux__.
+So far tried __GCC__ on __Ubuntu16.04__ and __Arch__.
